@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>单人聊天</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/zui/1.8.1/css/zui.min.css">
+  </head>
+  <body>
+
+    <div class="container">
+      <div class="row">     <h1>聊天室，等你来聊</h1></div>
+      <div class="row">
+        <div class="input-control has-icon-left has-icon-right" style="width:50%;">
+         <input id="userName" type="text" class="form-control" placeholder="聊天昵称">
+         <label for="inputEmailExample1" class="input-control-icon-left"><i class="icon icon-user"></i></label>
+         <label for="inputEmailExample1" class="input-control-icon-right"><a onclick="login()">登陆</a></label>
+
+       </div>
+
+
+      </div>
+      <br>
+      <div class="row">
+        <div class="input-control search-box search-box-circle has-icon-left has-icon-right" id="searchUser">
+            <input id="inputSearch" type="search" class="form-control search-input" placeholder="输入在线好友昵称聊天...enter开始查找">
+             <label for="inputSearchExample1" class="input-control-icon-left search-icon"><i class="icon icon-search"></i></label>
+             <a href="#" class="input-control-icon-right search-clear-btn"><i class="icon icon-remove"></i></a>
+        </div>
+      </div>
+      <hr>
+      <div class="row">
+         <div class="col-lg-3">
+
+           <p class="with-padding bg-success">聊天列表</p>
+		   
+           <div class="list-group">
+			<a href="#" class="list-group-item active">
+			<h4 class="list-group-item-heading"><i class="icon-user icon-2x"></i>&nbsp;&nbsp;多人聊天室</h4>
+			</a>
+			<a href="#" class="list-group-item">
+			<h4 class="list-group-item-heading"><i class="icon-user icon-2x"></i>&nbsp;&nbsp;steve</h4>
+			</a>
+
+            </div>
+         </div>
+         <div class="col-lg-1"></div>
+         <div class="col-lg-8">
+           <div class="comments" style="height: 500px;background-color: antiquewhite;overflow:auto">
+         <section class="comments-list" id="chatlist">
+
+         </section>
+         <footer>
+        
+         </footer>
+       </div>
+	   <div class="reply-form" id="commentReplyForm1" >
+	   
+	     <a href="###" class="avatar"></a>
+	     <form class="form">
+	       <div class="form-group">
+	         <textarea id="inputMsg" class="form-control new-comment-text" rows="2" value="" placeholder="开始聊天...  输入enter 发送消息"></textarea>
+	       </div>
+	     </form>
+	   </div>
+         </div>
+
+      </div>
+    </div>
+
+    <!-- ZUI Javascript 依赖 jQuery -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zui/1.8.1/lib/jquery/jquery.js"></script>
+    <!-- ZUI 标准版压缩后的 JavaScript 文件 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zui/1.8.1/js/zui.min.js"></script>
+    <script type="text/javascript">
+         window.CHAT = {
+            isLogin: false,
+            to: "",
+            me: "",
+            WS:{},
+            init: function () {
+              if (window.WebSocket) {
+                this.WS = new WebSocket("ws://127.0.0.1:12345/ws");
+                this.WS.onmessage = function(event) {
+                 var data = event.data;
+                 console.log("收到数据:" + data);
+                 //返回搜索消息
+                 if(data.indexOf("search") != -1){
+                     new $.zui.Messager('提示消息：'+data, {
+                        type: 'info' // 定义颜色主题
+                     }).show();
+                     if(data.indexOf("已找到")){  //可以进行会话
+                       CHAT.to = data.split(":")[1];
+                     }
+                 }
+
+                 //返回登陆消息
+                 if(data == "success"){
+                     CHAT.isLogin = true;
+                     new $.zui.Messager('提示消息：登陆成功', {
+                        type: 'success' // 定义颜色主题
+                     }).show();
+                     //连接成功不再修改昵称
+                      $("#userName").attr("disabled","disabled");
+                      CHAT.me = $("#userName").val();
+                 }
+
+                 //返回聊天信息
+                 if (data.split(":").length==3 && CHAT.me == data.split(":")[1]) {
+                     CHAT.to = data.split(":")[0];  //设置对话
+                     appendOtherchat(data);
+                 }
+               },
+
+               this.WS.onclose = function(event) {
+                  console.log("连接关闭");
+                  CHAT.isLogin = false;
+                  $("#userName").removeAttr("disabled");
+                  new $.zui.Messager('提示消息：聊天中断', {
+                     type: 'danger' // 定义颜色主题
+                  }).show();
+               },
+
+               this.WS.onopen = function(evt) {
+                  console.log("Connection open ...");
+               },
+
+              this.WS.onerror = function(event) {
+                  console.log("连接失败....");
+                  CHAT.isLogin = false;
+                  $("#userName").removeAttr("disabled");
+                  new $.zui.Messager('提示消息：聊天中断', {
+                     type: 'danger' // 定义颜色主题
+                  }).show();
+               }
+              } else {
+                alert("您的浏览器不支持聊天，请更换浏览器");
+              }
+
+            },
+            chat:function (msg) {
+              this.WS.send(msg);
+            }
+        }
+
+        CHAT.init();
+
+        function login() {
+          var userName = $("#userName").val();
+          if (userName != null && userName !='') {
+            //初始化聊天
+            CHAT.chat("init:"+userName);
+          } else {
+            alert("请输入用户名登录");
+          }
+
+        }
+
+
+        function Trim(str) {
+          return str.replace(/(^\s*)|(\s*$)/g, "");
+        }
+
+        function appendMy (msg) {  //拼接自己的聊天内容
+          document.getElementById('chatlist').innerHTML+="<div class='comment'><a class='avatar pull-right'><i class='icon-user icon-2x'></i></a><div class='content pull-right'><div><strong>我</strong></div><div class='text'>"+msg+"</div></div></div>";
+
+        }
+
+        function appendOtherchat(msg) {  //拼接别人的聊天信息到聊天室
+          var  msgs = msg.split(":");
+          document.getElementById('chatlist').innerHTML+="<div class='comment'><a class='avatar'><i class='icon-user icon-2x'></i></a><div class='content'><div><strong>"+msgs[0]+"</strong></div><div class='text'>"+msgs[2]+"</div></div></div>";
+        }
+
+
+        //搜索在线人员发送消息
+        document.getElementById("inputSearch").addEventListener('keyup', function(event) {
+           if (event.keyCode == "13") {
+            //回车执行查询
+             CHAT.chat("search:"+$('#inputSearch').val());
+           }
+
+        });
+
+        //发送聊天消息
+        document.getElementById('inputMsg').addEventListener('keyup', function(event) {
+        if (event.keyCode == "13") {
+         //回车执行查询
+        var  inputMsg = $('#inputMsg').val();
+        if (inputMsg == null || Trim(inputMsg) == "" ) {
+             alert("请输入聊天消息");
+        } else {
+            var  userName = $('#userName').val();
+            if (userName == null || userName == '') {
+              alert("请输入聊天昵称");
+            } else {
+              //发送消息 定义消息格式   me:to：[消息]
+              CHAT.chat(userName+":"+CHAT.to+":"+inputMsg);
+              appendMy(inputMsg);
+              //发送完清空输入
+               document.getElementById('inputMsg').focus();
+               document.getElementById('inputMsg').value="";
+            }
+        }
+     }
+ });
+    </script>
+  </body>
+</html>
